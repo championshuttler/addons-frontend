@@ -1,4 +1,6 @@
 /* eslint-disable import/no-extraneous-dependencies */
+import fs from 'fs';
+
 import autoprefixer from 'autoprefixer';
 import CircularDependencyPlugin from 'circular-dependency-plugin';
 import config from 'config';
@@ -7,6 +9,9 @@ import webpack from 'webpack';
 
 import 'core/polyfill';
 import { getClientConfig } from 'core/utils';
+
+const babelrc = fs.readFileSync('./.babelrc');
+export const babelrcObject = JSON.parse(babelrc);
 
 export function getStyleRules({
   bundleStylesWithJs = false,
@@ -73,6 +78,7 @@ export function getStyleRules({
             },
           },
         ],
+        sideEffects: true,
       },
     ];
   }
@@ -92,21 +98,39 @@ export function getAssetRules() {
     {
       test: /\.svg$/,
       use: [{ loader: 'svg-url-loader', options: urlLoaderOptions }],
+      sideEffects: true,
     },
     {
       test: /\.(jpg|png|gif|webm|mp4|otf|woff|woff2)$/,
       use: [{ loader: 'url-loader', options: urlLoaderOptions }],
+      sideEffects: true,
     },
   ];
 }
 
-export function getRules({ babelOptions, bundleStylesWithJs = false } = {}) {
+export function getRules({
+  babelOptions = babelrcObject,
+  bundleStylesWithJs = false,
+} = {}) {
   return [
     {
       test: /\.jsx?$/,
       exclude: /node_modules/,
       loader: 'babel-loader',
-      options: babelOptions,
+      options: {
+        ...babelOptions,
+        presets: [
+          [
+            '@babel/preset-env',
+            {
+              useBuiltIns: 'entry',
+              // We need this to enable tree-shaking.
+              modules: false,
+            },
+          ],
+          ...babelOptions.presets.slice(1),
+        ],
+      },
     },
     ...getStyleRules({ bundleStylesWithJs }),
     ...getAssetRules(),
